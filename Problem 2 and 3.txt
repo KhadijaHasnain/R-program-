@@ -1,0 +1,59 @@
+Problem # 2
+
+library(maps)
+library(mapproj)
+library(tidyverse)
+
+# Read state health insurance coverage data from CSV
+insurance_data <- read.csv("state_health_insurance_coverage_2021.csv")
+
+# Merge state data with map data
+map_data <- map_data("state")
+merged_data <- merge(map_data, insurance_data, by.x = "region", by.y = "State", all.x = TRUE)
+
+# Plot map
+ggplot() +
+  geom_map(data = merged_data, map = merged_data, aes(map_id = region, fill = Uninsured), color = "black") +
+  scale_fill_gradient(name = "Uninsured Rate", limits = c(0.05 , 0.20), low = "skyblue", high = "blue4") +
+  expand_limits(x = merged_data$long, y = merged_data$lat) +
+  coord_map() +
+  theme_void() +
+  labs(title = "Percentage of Residents without Health Insurance Coverage in the U.S., 2021")
+
+
+
+Problem 3
+
+library(shiny)
+
+ui <- fluidPage(
+  tabsetPanel(
+    tabPanel("CPI Evolution",
+             selectInput(inputId = "start_month", label = "Please select the start month", choices = unique(cpi$iss_period), selected = min(cpi$iss_period)),
+             selectInput(inputId = "current_year", label = "Please select the current year", choices = unique(year(cpi$iss_period)), selected = max(year(cpi$iss_period))),
+             selectInput(inputId = "current_date", label = "Please select the start year", choices = unique(cpi$iss_period), selected = max(cpi$iss_period)),
+             selectInput(inputId = "end_month", label = "Please select the end month", choices = NULL),
+             textOutput("conversion_result")
+    )
+  )
+)
+
+server <- function(input, output) {
+  converted_amount <- eventReactive(input$convert_button, {
+    base_cpi <- cpi$cpi[cpi$iss_period == input$base_date]
+    current_cpi <- cpi$cpi[cpi$iss_period == input$current_date]
+    
+    if (length(base_cpi) == 0 || length(current_cpi) == 0) {
+      return("Error: Selected dates not found in the dataset.")
+    }
+    
+    conversion <- input$dollar_amount * (current_cpi / base_cpi)
+    paste0("$", round(conversion, 2))
+  })
+  
+  output$conversion_result <- renderText({
+    converted_amount()
+  })
+}
+
+shinyApp(ui = ui, server = server)

@@ -1,0 +1,71 @@
+library(shiny)
+
+# Read CPI data from CSV file
+cpi_data <- read.csv("cpi.csv")
+
+ui <- fluidPage(
+  tabsetPanel(
+    tabPanel("CPI Evolution",
+             selectInput(inputId = "start_year", label = "Please select the start year", choices = unique(cpi_data$year), selected = min(cpi_data$year)),
+             selectInput(inputId = "current_year", label = "Please select the current year", choices = unique(cpi_data$year), selected = max(cpi_data$year)),
+             selectInput(inputId = "start_month", label = "Please select the start month", choices = 1:12, selected = 1),
+             selectInput(inputId = "end_month", label = "Please select the end month", choices = 1:12, selected = 12),
+             plotOutput("line_plot", width = "100%", height = "400px")
+    ),
+    tabPanel("CPI Inflation Calculator",
+             numericInput(inputId = "amount_in_euros", label = "Please enter the amount in euros", value = 100),
+             selectInput(inputId = "start_year_conversion", label = "Please select the start year", choices = unique(cpi_data$year), selected = min(cpi_data$year)),
+             selectInput(inputId = "current_year_conversion", label = "Please select the current year", choices = unique(cpi_data$year), selected = max(cpi_data$year)),
+             selectInput(inputId = "start_month_conversion", label = "Please select the start month", choices = 1:12, selected = 1),
+             selectInput(inputId = "end_month_conversion", label = "Please select the end month", choices = 1:12, selected = 12),
+             actionButton(inputId = "convert_button", label = "Convert"),
+             textOutput("conversion_result")
+    )
+  )
+)
+
+server <- function(input, output) {
+  selected_values <- reactiveValues(
+    start_year = min(cpi_data$year),
+    current_year = max(cpi_data$year),
+    start_month = 1,
+    end_month = 12
+  )
+  
+  output$line_plot <- renderPlot({
+    start_date <- as.Date(paste0(selected_values$start_year, "-", selected_values$start_month, "-01"))
+    end_date <- as.Date(paste0(selected_values$current_year, "-", selected_values$end_month, "-01"))
+    
+    # Filter CPI data based on selected date range
+    filtered_data <- cpi_data[cpi_data$year >= selected_values$start_year & cpi_data$year <= selected_values$current_year, ]
+    
+    # Generate x-values as a sequence of dates from start_date to end_date
+    x_values <- as.Date(with(filtered_data, paste(year, month, "01", sep = "-")))
+    y_values <- filtered_data$cpi
+    
+    # Plot CPI evolution
+    plot(x_values, y_values, type = "l", xlab = "Date", ylab = "CPI")
+  })
+  
+  observeEvent(input$convert_button, {
+    start_year <- input$start_year_conversion
+    current_year <- input$current_year_conversion
+    start_month <- input$start_month_conversion
+    end_month <- input$end_month_conversion
+    
+    # Filter CPI data based on selected date range
+    filtered_data <- cpi_data[cpi_data$year == current_year & cpi_data$month >= start_month & cpi_data$month <= end_month, ]
+    
+    # Calculate average CPI for the selected period
+    avg_cpi <- mean(filtered_data$cpi)
+    
+    # Calculate dollar amount based on euros and average CPI
+    dollar_amount <- input$amount_in_euros * avg_cpi
+    
+    output$conversion_result <- renderText({
+      paste("Amount in dollars:", dollar_amount)
+    })
+  })
+}
+
+shinyApp(ui = ui, server = server)
